@@ -3,11 +3,12 @@
 import { useThree, useFrame } from '@react-three/fiber';
 import { useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { useInteraction } from '../contexts/InteractionContext';
 
 // Physics constants
 const DAMPING_FACTOR = 0.99;
-const INITIAL_ZOOM = 20;
-const ZOOM_MIN = 10;
+const INITIAL_ZOOM = 30;
+const ZOOM_MIN = 30;
 const ZOOM_MAX = 100;
 const ZOOM_SPEED_PINCH = 4;
 const ZOOM_SPEED_SCROLL = 0.5;
@@ -17,6 +18,11 @@ const BOUNCE_FORCE_DRAG = 0.3;
 const BOUNCE_FORCE_MOMENTUM = 0.25;
 const BOUNCE_DAMPING = 0.9;
 const VELOCITY_REVERSAL = -0.2;
+
+// Easing function with smooth ease-out (ease-out-quint for extra smoothness)
+const easeOutQuint = (t: number): number => {
+  return 1 - Math.pow(1 - t, 5);
+};
 
 // Boundary configuration
 const BOUNDARIES = {
@@ -33,10 +39,14 @@ interface Vector2D {
 
 export default function CameraControls() {
   const { camera, gl } = useThree();
+  const { isDraggingRef, selectedPositionRef } = useInteraction();
   const isDragging = useRef<boolean>(false);
+  const dragStartPos = useRef<Vector2D>({ x: 0, y: 0 });
   const previousMousePosition = useRef<Vector2D>({ x: 0, y: 0 });
   const velocity = useRef<Vector2D>({ x: 0, y: 0 });
   const targetZoom = useRef<number>(INITIAL_ZOOM);
+  const targetPosition = useRef<Vector2D | null>(null);
+  const isAnimatingSelection = useRef<boolean>(false);
   const bounceVelocity = useRef<Vector2D>({ x: 0, y: 0 });
   
   const boundaries = useMemo(() => BOUNDARIES, []);
@@ -47,6 +57,8 @@ export default function CameraControls() {
 
     const handleMouseDown = (e: MouseEvent) => {
       isDragging.current = true;
+      isDraggingRef.current = false;
+      dragStartPos.current = { x: e.clientX, y: e.clientY };
       previousMousePosition.current = { x: e.clientX, y: e.clientY };
       velocity.current = { x: 0, y: 0 };
       canvas.style.cursor = 'grabbing';
@@ -57,6 +69,14 @@ export default function CameraControls() {
 
       const deltaX = e.clientX - previousMousePosition.current.x;
       const deltaY = e.clientY - previousMousePosition.current.y;
+      
+      const totalDragDistance = Math.sqrt(
+        Math.pow(e.clientX - dragStartPos.current.x, 2) + 
+        Math.pow(e.clientY - dragStartPos.current.y, 2)
+      );
+      if (totalDragDistance > 3) {
+        isDraggingRef.current = true;
+      }
 
       if (camera instanceof THREE.OrthographicCamera) {
         const zoomFactor = 1 / camera.zoom;
@@ -86,6 +106,9 @@ export default function CameraControls() {
     const handleMouseUp = () => {
       isDragging.current = false;
       canvas.style.cursor = 'grab';
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 100);
     };
 
     const handleWheel = (e: WheelEvent) => {
@@ -119,18 +142,61 @@ export default function CameraControls() {
 
   useFrame(() => {
     if (camera instanceof THREE.OrthographicCamera) {
+      // Handle zoom to selected element
+      if (selectedPositionRef.current && !isDragging.current) {
+        const [targetX, targetY] = selectedPositionRef.current;
+        targetPosition.current = { x: targetX, y: targetY };
+        targetZoom.current = 60;
+        velocity.current = { x: 0, y: 0 };
+        isAnimatingSelection.current = true;
+      } else if (!selectedPositionRef.current && targetPosition.current) {
+        targetPosition.current = null;
+        targetZoom.current = INITIAL_ZOOM;
+      }
+
+      // Animate camera position to target
+      if (targetPosition.current && !isDragging.current) {
+        const posX = camera.position.x;
+        const posY = camera.position.y;
+        const diffX = targetPosition.current.x - posX;
+        const diffY = targetPosition.current.y - posY;
+        const distance = Math.sqrt(diffX * diffX + diffY * diffY);
+        
+        if (distance > 0.01) {
+          const normalizedDistance = Math.min(distance / 35, 1);
+          const progress = 1 - normalizedDistance;
+          const easedProgress = easeOutQuint(progress);
+          const baseLerpFactor = 0.015;
+          const lerpFactor = baseLerpFactor + (easedProgress * 0.08);
+          
+          camera.position.x += diffX * lerpFactor;
+          camera.position.y += diffY * lerpFactor;
+        }
+      }
+      
       // Zoom with velocity reduction near target
       const zoomDiff = targetZoom.current - camera.zoom;
       if (Math.abs(zoomDiff) > 0.01) {
-        // Use fast lerp when far from target, slow lerp when close
-        const distanceRatio = Math.abs(zoomDiff) / camera.zoom;
-        const lerpFactor = distanceRatio > 0.1 ? ZOOM_LERP_FAST : ZOOM_LERP_SLOW;
-        camera.zoom += zoomDiff * lerpFactor;
+        if (isAnimatingSelection.current) {
+          const normalizedZoomDiff = Math.min(Math.abs(zoomDiff) / 60, 1);
+          const progress = 1 - normalizedZoomDiff;
+          const easedProgress = easeOutQuint(progress);
+          const baseLerpFactor = 0.015;
+          const lerpFactor = baseLerpFactor + (easedProgress * 0.08);
+          
+          camera.zoom += zoomDiff * lerpFactor;
+        } else {
+          const distanceRatio = Math.abs(zoomDiff) / camera.zoom;
+          const lerpFactor = distanceRatio > 0.1 ? ZOOM_LERP_FAST : ZOOM_LERP_SLOW;
+          camera.zoom += zoomDiff * lerpFactor;
+        }
         camera.updateProjectionMatrix();
+      } else if (isAnimatingSelection.current) {
+        isAnimatingSelection.current = false;
       }
       
       // Drag momentum with smooth ease-out and damping
-      if (!isDragging.current && (Math.abs(velocity.current.x) > 0.001 || Math.abs(velocity.current.y) > 0.001)) {
+      if (!isDragging.current && !targetPosition.current && (Math.abs(velocity.current.x) > 0.001 || Math.abs(velocity.current.y) > 0.001)) {
         const zoomFactor = 1 / camera.zoom;
         const newX = camera.position.x - velocity.current.x * zoomFactor;
         const newY = camera.position.y + velocity.current.y * zoomFactor;
