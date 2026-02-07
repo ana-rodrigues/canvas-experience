@@ -10,7 +10,7 @@ const DAMPING_FACTOR = 0.99;
 const INITIAL_ZOOM = 30;
 const ZOOM_MIN = 30;
 const ZOOM_MAX = 100;
-const ZOOM_SPEED_PINCH = 4;
+const ZOOM_SPEED_PINCH = 6;
 const ZOOM_LERP_FAST = 0.5;
 const ZOOM_LERP_SLOW = 0.08;
 const SCROLL_BOUNCE_MULTIPLIER = 4;
@@ -123,7 +123,7 @@ export default function CameraControls() {
         if (isPinch) {
           // Pinch gesture: zoom
           const delta = -e.deltaY;
-          const zoomFactor = 1 + (delta * 0.001 * ZOOM_SPEED_PINCH);
+          const zoomFactor = 1 + (delta * 0.0015 * ZOOM_SPEED_PINCH);
           const newZoom = targetZoom.current * zoomFactor;
           targetZoom.current = THREE.MathUtils.clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
         } else {
