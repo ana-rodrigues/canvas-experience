@@ -11,12 +11,16 @@ const INITIAL_ZOOM = 30;
 const ZOOM_MIN = 30;
 const ZOOM_MAX = 100;
 const ZOOM_SPEED_PINCH = 4;
-const ZOOM_SPEED_SCROLL = 0.5;
 const ZOOM_LERP_FAST = 0.5;
 const ZOOM_LERP_SLOW = 0.08;
+const SCROLL_BOUNCE_MULTIPLIER = 4;
+const SELECTION_ANIM_BASE_LERP = 0.015;
+const SELECTION_ANIM_LERP_RANGE = 0.08;
+const SELECTION_ANIM_NORMALIZE_DISTANCE = 35;
+const SELECTION_ANIM_NORMALIZE_ZOOM = 60;
 const BOUNCE_FORCE_DRAG = 0.3;
 const BOUNCE_FORCE_MOMENTUM = 0.25;
-const BOUNCE_DAMPING = 0.9;
+const BOUNCE_DAMPING = 0.98;
 const VELOCITY_REVERSAL = -0.2;
 
 // Easing function with smooth ease-out (ease-out-quint for extra smoothness)
@@ -49,7 +53,7 @@ export default function CameraControls() {
   const isAnimatingSelection = useRef<boolean>(false);
   const bounceVelocity = useRef<Vector2D>({ x: 0, y: 0 });
   
-  const boundaries = useMemo(() => BOUNDARIES, []);
+  const boundaries = BOUNDARIES;
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -115,13 +119,34 @@ export default function CameraControls() {
       e.preventDefault();
       if (camera instanceof THREE.OrthographicCamera) {
         const isPinch = e.ctrlKey;
-        const zoomSpeed = isPinch ? ZOOM_SPEED_PINCH : ZOOM_SPEED_SCROLL;
         
-        const delta = -e.deltaY;
-        const zoomFactor = 1 + (delta * 0.001 * zoomSpeed);
-        const newZoom = targetZoom.current * zoomFactor;
-        
-        targetZoom.current = THREE.MathUtils.clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
+        if (isPinch) {
+          // Pinch gesture: zoom
+          const delta = -e.deltaY;
+          const zoomFactor = 1 + (delta * 0.001 * ZOOM_SPEED_PINCH);
+          const newZoom = targetZoom.current * zoomFactor;
+          targetZoom.current = THREE.MathUtils.clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
+        } else {
+          // Regular scroll: pan camera
+          const zoomFactor = 1 / camera.zoom;
+          const panSpeed = 0.5;
+          const deltaX = e.deltaX * panSpeed;
+          const deltaY = -e.deltaY * panSpeed;
+          
+          const newX = camera.position.x + deltaX * zoomFactor;
+          const newY = camera.position.y + deltaY * zoomFactor;
+          
+          // Check for boundary collision and apply bounce
+          if (newX < boundaries.minX || newX > boundaries.maxX) {
+            bounceVelocity.current.x = -deltaX * zoomFactor * BOUNCE_FORCE_DRAG * SCROLL_BOUNCE_MULTIPLIER;
+          }
+          if (newY < boundaries.minY || newY > boundaries.maxY) {
+            bounceVelocity.current.y = -deltaY * zoomFactor * BOUNCE_FORCE_DRAG * SCROLL_BOUNCE_MULTIPLIER;
+          }
+          
+          camera.position.x = THREE.MathUtils.clamp(newX, boundaries.minX, boundaries.maxX);
+          camera.position.y = THREE.MathUtils.clamp(newY, boundaries.minY, boundaries.maxY);
+        }
       }
     };
 
@@ -163,11 +188,10 @@ export default function CameraControls() {
         const distance = Math.sqrt(diffX * diffX + diffY * diffY);
         
         if (distance > 0.01) {
-          const normalizedDistance = Math.min(distance / 35, 1);
+          const normalizedDistance = Math.min(distance / SELECTION_ANIM_NORMALIZE_DISTANCE, 1);
           const progress = 1 - normalizedDistance;
           const easedProgress = easeOutQuint(progress);
-          const baseLerpFactor = 0.015;
-          const lerpFactor = baseLerpFactor + (easedProgress * 0.08);
+          const lerpFactor = SELECTION_ANIM_BASE_LERP + (easedProgress * SELECTION_ANIM_LERP_RANGE);
           
           camera.position.x += diffX * lerpFactor;
           camera.position.y += diffY * lerpFactor;
@@ -178,11 +202,10 @@ export default function CameraControls() {
       const zoomDiff = targetZoom.current - camera.zoom;
       if (Math.abs(zoomDiff) > 0.01) {
         if (isAnimatingSelection.current) {
-          const normalizedZoomDiff = Math.min(Math.abs(zoomDiff) / 60, 1);
+          const normalizedZoomDiff = Math.min(Math.abs(zoomDiff) / SELECTION_ANIM_NORMALIZE_ZOOM, 1);
           const progress = 1 - normalizedZoomDiff;
           const easedProgress = easeOutQuint(progress);
-          const baseLerpFactor = 0.015;
-          const lerpFactor = baseLerpFactor + (easedProgress * 0.08);
+          const lerpFactor = SELECTION_ANIM_BASE_LERP + (easedProgress * SELECTION_ANIM_LERP_RANGE);
           
           camera.zoom += zoomDiff * lerpFactor;
         } else {
