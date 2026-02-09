@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 
 const GRID_SIZE = 80;
-const GRID_SPACING = 2;
+const GRID_SPACING = 4;
 const GRID_COLOR = '#5c5959';
-const GRID_OPACITY = 0.6;
+const GRID_OPACITY = 0.4;
 
 export default function InfiniteGrid() {
   const gridLines = useMemo(() => {

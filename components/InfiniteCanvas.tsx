@@ -6,7 +6,7 @@ import { OrthographicCamera } from '@react-three/drei';
 import { InteractionProvider, useInteraction } from '../contexts/InteractionContext';
 import CameraControls from './CameraControls';
 import InfiniteGrid from './InfiniteGrid';
-import TestCube from './TestCube';
+import Model3D from './Model3D';
 
 const INITIAL_ZOOM = 30;
 
@@ -26,24 +26,64 @@ function CanvasContent({ selectedId, onCubeClick, onCanvasClick }: {
 
   return (
     <>
-      <OrthographicCamera makeDefault position={[0, 0, 10]} zoom={INITIAL_ZOOM} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
+      <OrthographicCamera 
+        makeDefault 
+        position={[0, 1.5, 10]} 
+        rotation={[-0.15, 0, 0]}
+        zoom={INITIAL_ZOOM}
+      />
+      
+      {/* Studio lighting with very deep shadows */}
+      
+      {/* Very low ambient for dramatic shadows */}
+      <ambientLight intensity={0.3} color="#ffffff" />
+      
+      {/* Main key light from upper front-right - very strong */}
+      <directionalLight 
+        position={[10, 12, 12]} 
+        intensity={4.0} 
+        color="#ffffff"
+        castShadow
+      />
+      
+      {/* Secondary key from left - reduced */}
+      <directionalLight 
+        position={[-8, 10, 10]} 
+        intensity={1.2} 
+        color="#ffffff"
+      />
+      
+      {/* Front fill light - minimal to preserve shadow depth */}
+      <directionalLight 
+        position={[0, 4, 15]} 
+        intensity={0.8} 
+        color="#ffffff"
+      />
+      
+      {/* Top light - very subtle */}
+      <directionalLight 
+        position={[0, 20, 2]} 
+        intensity={0.6} 
+        color="#ffffff"
+      />
+      
       <CameraControls />
-      <InfiniteGrid />
+      {/* <InfiniteGrid /> */}
       <group onPointerDown={handleCanvasClick}>
         <mesh position={[0, 0, -1]} visible={false}>
           <planeGeometry args={[1000, 1000]} />
         </mesh>
       </group>
-      <TestCube id="cube-1" position={[-9, 6, 0]} isSelected={selectedId === "cube-1"} isDimmed={selectedId !== null && selectedId !== "cube-1"} onSelect={onCubeClick} />
-      <TestCube id="cube-2" position={[-3, 6, 0]} isSelected={selectedId === "cube-2"} isDimmed={selectedId !== null && selectedId !== "cube-2"} onSelect={onCubeClick} />
-      <TestCube id="cube-3" position={[3, 6, 0]} isSelected={selectedId === "cube-3"} isDimmed={selectedId !== null && selectedId !== "cube-3"} onSelect={onCubeClick} />
-      <TestCube id="cube-4" position={[9, 6, 0]} isSelected={selectedId === "cube-4"} isDimmed={selectedId !== null && selectedId !== "cube-4"} onSelect={onCubeClick} />
-      <TestCube id="cube-5" position={[-9, -6, 0]} isSelected={selectedId === "cube-5"} isDimmed={selectedId !== null && selectedId !== "cube-5"} onSelect={onCubeClick} />
-      <TestCube id="cube-6" position={[-3, -6, 0]} isSelected={selectedId === "cube-6"} isDimmed={selectedId !== null && selectedId !== "cube-6"} onSelect={onCubeClick} />
-      <TestCube id="cube-7" position={[3, -6, 0]} isSelected={selectedId === "cube-7"} isDimmed={selectedId !== null && selectedId !== "cube-7"} onSelect={onCubeClick} />
-      <TestCube id="cube-8" position={[9, -6, 0]} isSelected={selectedId === "cube-8"} isDimmed={selectedId !== null && selectedId !== "cube-8"} onSelect={onCubeClick} />
+      <Model3D 
+        id="model-1" 
+        modelPath="/models/model1.glb" 
+        position={[0, 0, 0]} 
+        rotation={[0, Math.PI / 6, 0]}
+        scale={0.008} 
+        isSelected={selectedId === "model-1"} 
+        isDimmed={selectedId !== null && selectedId !== "model-1"} 
+        onSelect={onCubeClick} 
+      />
     </>
   );
 }
@@ -60,9 +100,10 @@ export default function InfiniteCanvas() {
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#000' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%' }}>
       <InteractionProvider>
-        <Canvas>
+        <Canvas style={{ background: '#000000' }}>
+          <color attach="background" args={['#000000']} />
           <CanvasContent 
             selectedId={selectedId} 
             onCubeClick={handleCubeClick}

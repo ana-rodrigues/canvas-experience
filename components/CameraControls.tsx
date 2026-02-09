@@ -18,10 +18,11 @@ const SELECTION_ANIM_BASE_LERP = 0.015;
 const SELECTION_ANIM_LERP_RANGE = 0.08;
 const SELECTION_ANIM_NORMALIZE_DISTANCE = 35;
 const SELECTION_ANIM_NORMALIZE_ZOOM = 60;
-const BOUNCE_FORCE_DRAG = 0.3;
-const BOUNCE_FORCE_MOMENTUM = 0.25;
-const BOUNCE_DAMPING = 0.98;
-const VELOCITY_REVERSAL = -0.2;
+const BOUNCE_FORCE_DRAG = 0.2;
+const BOUNCE_FORCE_MOMENTUM = 0.15;
+const BOUNCE_DAMPING = 0.92;
+const VELOCITY_REVERSAL = -0.1;
+const SELECTION_ZOOM = 120;
 
 // Easing function with smooth ease-out (ease-out-quint for extra smoothness)
 const easeOutQuint = (t: number): number => {
@@ -30,10 +31,10 @@ const easeOutQuint = (t: number): number => {
 
 // Boundary configuration
 const BOUNDARIES = {
-  minX: -10,
-  maxX: 10,
-  minY: -10,
-  maxY: 10,
+  minX: -30,
+  maxX: 30,
+  minY: -30,
+  maxY: 30,
 } as const;
 
 interface Vector2D {
@@ -171,8 +172,9 @@ export default function CameraControls() {
       if (selectedPositionRef.current && !isDragging.current) {
         const [targetX, targetY] = selectedPositionRef.current;
         targetPosition.current = { x: targetX, y: targetY };
-        targetZoom.current = 60;
+        targetZoom.current = SELECTION_ZOOM;
         velocity.current = { x: 0, y: 0 };
+        bounceVelocity.current = { x: 0, y: 0 };
         isAnimatingSelection.current = true;
       } else if (!selectedPositionRef.current && targetPosition.current) {
         targetPosition.current = null;
@@ -183,8 +185,14 @@ export default function CameraControls() {
       if (targetPosition.current && !isDragging.current) {
         const posX = camera.position.x;
         const posY = camera.position.y;
+        
+        // Account for camera rotation when calculating target position
+        // If camera is tilted down, we need to offset the Y position upward
+        const cameraRotationX = camera.rotation.x;
+        const yOffset = cameraRotationX !== 0 ? Math.tan(Math.abs(cameraRotationX)) * camera.position.z * 1.2 : 0;
+        
         const diffX = targetPosition.current.x - posX;
-        const diffY = targetPosition.current.y - posY;
+        const diffY = (targetPosition.current.y + yOffset) - posY;
         const distance = Math.sqrt(diffX * diffX + diffY * diffY);
         
         if (distance > 0.01) {
@@ -198,15 +206,12 @@ export default function CameraControls() {
         }
       }
       
-      // Zoom with velocity reduction near target
+      // Zoom with constant speed for linear feel
       const zoomDiff = targetZoom.current - camera.zoom;
       if (Math.abs(zoomDiff) > 0.01) {
         if (isAnimatingSelection.current) {
-          const normalizedZoomDiff = Math.min(Math.abs(zoomDiff) / SELECTION_ANIM_NORMALIZE_ZOOM, 1);
-          const progress = 1 - normalizedZoomDiff;
-          const easedProgress = easeOutQuint(progress);
-          const lerpFactor = SELECTION_ANIM_BASE_LERP + (easedProgress * SELECTION_ANIM_LERP_RANGE);
-          
+          // Use constant lerp factor for smooth, linear zoom
+          const lerpFactor = 0.12;
           camera.zoom += zoomDiff * lerpFactor;
         } else {
           const distanceRatio = Math.abs(zoomDiff) / camera.zoom;
