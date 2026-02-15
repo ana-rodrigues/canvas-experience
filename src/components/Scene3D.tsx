@@ -30,12 +30,28 @@ export default function Scene3D() {
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Canvas
         camera={{
-          position: [0, 5, 10],
+          position: [8, 4, 8],
           fov: 75,
         }}
+        style={{ background: '#e3e1dfff' }}
+        shadows
       >
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
+        <ambientLight intensity={2.5} color="#cff1ffff" />
+        <directionalLight 
+          position={[8, 12, 6]} 
+          intensity={3} 
+          color="#ffe4b3"
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+          shadow-camera-far={50}
+          shadow-camera-left={-10}
+          shadow-camera-right={10}
+          shadow-camera-top={10}
+          shadow-camera-bottom={-10}
+        />
+        <directionalLight position={[-6, 8, 4]} intensity={2} color="#ffeedd" />
+        <hemisphereLight intensity={1.2} color="#fff9f0" groundColor="#d4c5b0" />
         <OrbitControls 
           ref={controlsRef}
           enableDamping
@@ -43,6 +59,8 @@ export default function Scene3D() {
           minDistance={3}
           maxDistance={50}
           enabled={controlsEnabled}
+          maxPolarAngle={Math.PI / 2.5}
+          minPolarAngle={0}
         />
         
         <CameraController 
@@ -51,7 +69,12 @@ export default function Scene3D() {
           controlsRef={controlsRef}
         />
         
-        <gridHelper args={[20, 20]} />
+        {/*<gridHelper args={[20, 20, '#999999', '#999999']} />*/}
+        
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <planeGeometry args={[50, 50]} />
+          <shadowMaterial opacity={0.15} />
+        </mesh>
         
         <ObjectGrid 
           rows={2} 
